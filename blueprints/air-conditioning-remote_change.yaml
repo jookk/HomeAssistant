@@ -1,0 +1,43 @@
+blueprint:    
+  name: air_conditioning_remote_change
+  description: "Cambia temperatura condizionatore con telecomando"
+  domain: automation
+  input:
+    climate:
+      name: Climatizzatore
+      selector: 
+        entity: 
+          domain: climate
+    remote:
+      name: Telecomando
+      selector: 
+        entity: 
+          domain: remote   
+    device: 
+      selector: 
+        text: 
+triggers:
+  - entity_id: !input climate 
+    attribute: temperature
+    id: temp
+    trigger: state
+  - trigger: state
+    entity_id: !input climate 
+    attribute: hvac_action
+conditions:
+  - condition: template
+    value_template: "{{ states.climate.condizionatoresu.attributes.hvac_action == 'cooling' }}"
+actions:
+  - variables:
+      int: "{{ trigger.to_state.attributes.temperature | int }}"
+  - action: script.turn_on
+    entity_id: script.air_conditioning_broadlink_activation
+    target:
+      entity_id: script.air_conditioning_broadlink_activation
+    data:
+      variables:
+        command: temperature
+        temperature: "{{ int }}"
+        remote: !input remote 
+        device: !input device
+mode: single
