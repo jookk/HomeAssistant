@@ -3,7 +3,6 @@ blueprint:
   description: "Cambia temperatura condizionatore con telecomando"
   domain: automation
   source_url: https://github.com/giannisigalotti/HomeAssistant/blob/main/blueprints/air-conditioning-remote_change.yaml
-  domain: automation
   input:
     climate:
       name: Climatizzatore da attivare
@@ -27,9 +26,11 @@ triggers:
   - trigger: state
     entity_id: !input climate 
     attribute: hvac_action
+variables:
+    climatename: !input climate
 conditions:
   - condition: template
-    value_template: "{{ states.climate.condizionatoresu.attributes.hvac_action == 'cooling' }}"
+    value_template: "{{ state_attr(climatename,'hvac_action') == 'cooling' }}"
 actions:
   - variables:
       int: "{{ trigger.to_state.attributes.temperature | int }}"
