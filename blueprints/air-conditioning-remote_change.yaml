@@ -6,16 +6,17 @@ blueprint:
   domain: automation
   input:
     climate:
-      name: Climatizzatore
+      name: Climatizzatore da attivare
       selector: 
         entity: 
           domain: climate
     remote:
-      name: Telecomando
+      name: Telecomando di attivazione
       selector: 
         entity: 
           domain: remote   
     device: 
+      name: Device associato al telecomando
       selector: 
         text: 
 triggers:
