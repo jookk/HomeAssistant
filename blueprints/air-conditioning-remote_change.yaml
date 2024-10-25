@@ -1,5 +1,5 @@
 blueprint:    
-  name: Air-conditioning remote change
+  name: air_conditioning_remote_change
   description: "Cambia temperatura condizionatore con telecomando"
   domain: automation
   source_url: https://github.com/giannisigalotti/HomeAssistant/blob/main/blueprints/air-conditioning-remote_change.yaml
