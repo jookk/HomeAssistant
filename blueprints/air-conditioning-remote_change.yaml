@@ -14,10 +14,14 @@ blueprint:
       selector: 
         entity: 
           domain: remote   
-    device: 
-      name: Device associato al telecomando
+    device_cool: 
+      name: Device associato al telecomando per quando si vuole raffreddare
       selector: 
         text: 
+    device_heat: 
+      name: Device associato al telecomando per quando si vuole scaldare
+      selector: 
+        text:     
 triggers:
   - entity_id: !input climate 
     attribute: temperature
@@ -28,9 +32,17 @@ triggers:
     attribute: hvac_action
 variables:
     climatename: !input climate
+    device_c: !input device_cool
+    device_h: !input device_heat
+    device: >
+        {%- if (is_state(climatename,"cool")) -%}
+            {{ device_c }}
+        {%- else -%}
+            {{ device_h }}
+        {%- endif -%}
 conditions:
   - condition: template
-    value_template: "{{ state_attr(climatename,'hvac_action') == 'cooling' }}"
+    value_template: "{{ state_attr(climatename,'hvac_action') == 'cooling' or state_attr(climatename,'hvac_action') == 'heating' }}"
 actions:
   - variables:
       int: "{{ trigger.to_state.attributes.temperature | int }}"
@@ -41,7 +53,7 @@ actions:
     data:
       variables:
         command: temperature
-        temperature: "{{ int }}"
+        climate: !input climate
         remote: !input remote 
-        device: !input device
+        device: "{{ device }}"
 mode: single
