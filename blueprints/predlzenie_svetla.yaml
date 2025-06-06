@@ -1,0 +1,82 @@
+blueprint:
+  name: Predĺženie svietenia po rýchlom zapnutí
+  description: >
+    Ak sa svetlo znovu zapne do X sekúnd po vypnutí, predĺži svietenie na Y minút.
+  domain: automation
+  input:
+    target_light:
+      name: Svetlo
+      description: Svetlo, ktoré sa má ovládať
+      selector:
+        entity:
+          domain: light
+    vypnutie_timer:
+      name: Časový limit medzi vypnutím a opätovným zapnutím (sekundy)
+      default: 90
+      selector:
+        number:
+          min: 10
+          max: 300
+          unit_of_measurement: sekúnd
+          mode: slider
+    predlzenie_cas:
+      name: Dĺžka predĺženého svietenia (minúty)
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: minút
+          mode: slider
+    pomocna_hodnota:
+      name: Input_datetime na uloženie času vypnutia
+      description: Musí byť typu "Dátum a čas"
+      selector:
+        entity:
+          domain: input_datetime
+
+mode: restart
+trigger:
+  - platform: state
+    entity_id: !input target_light
+    from: 'on'
+    to: 'off'
+    id: vypnutie
+  - platform: state
+    entity_id: !input target_light
+    from: 'off'
+    to: 'on'
+    id: zapnutie
+
+condition: []
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: vypnutie
+        sequence:
+          - service: input_datetime.set_datetime
+            data:
+              entity_id: !input pomocna_hodnota
+              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+      - conditions:
+          - condition: trigger
+            id: zapnutie
+          - condition: template
+            value_template: >
+              {% set last_off = states[inputs.pomocna_hodnota].state %}
+              {% if last_off != 'unknown' %}
+                {{ (now() - strptime(last_off, '%Y-%m-%d %H:%M:%S')).total_seconds() < (inputs.vypnutie_timer | int) }}
+              {% else %}
+                false
+              {% endif %}
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: !input target_light
+          - delay:
+              minutes: !input predlzenie_cas
+          - service: light.turn_off
+            target:
+              entity_id: !input target_light
