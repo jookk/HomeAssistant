@@ -1,0 +1,123 @@
+blueprint:
+  name: WC Motion Light with Manual Override
+  description: Turns on a light in the WC based on motion and time of day, with a manual switch override.
+  domain: automation
+  source_url: https://gist.github.com/yourusername/example_gist_url # Replace with your actual Gist URL if you share it
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: The motion sensor in the WC.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    daytime_light_target:
+      name: Daytime Light (Target)
+      description: The light to turn on during daytime hours (6:00 AM - 8:59 PM).
+      selector:
+        target:
+          entity:
+            domain: light
+    nighttime_light_target:
+      name: Nighttime Light (Target)
+      description: The light to turn on during nighttime hours (9:00 PM - 5:59 AM). This light will have a warm color.
+      selector:
+        target:
+          entity:
+            domain: light
+    manual_override_switch:
+      name: Manual Override Switch
+      description: The switch used for manual control of the light.
+      selector:
+        entity:
+          domain: switch
+    light_duration:
+      name: Light On Duration
+      description: How long the light stays on after motion is detected (in seconds).
+      default: 35
+      selector:
+        number:
+          min: 1
+          max: 300
+          unit_of_measurement: seconds
+    people_at_home_entities:
+      name: People at Home
+      description: Select the person entities that represent someone being home. The automation only runs if at least one is in the 'home' zone.
+      selector:
+        entity:
+          domain: person
+          multiple: true
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    from: 'off'
+    to: 'on'
+
+condition:
+  - condition: or
+    conditions:
+      # OPRAVENÁ SEKCIA PRE PODMIENKY ZÓNY
+      # Prechádzame cez každý vybraný 'person' entitu a vytvárame pre ňu 'zone' podmienku
+      {% for person_entity in people_at_home_entities %}
+      - condition: zone
+        entity_id: {{ person_entity }}
+        zone: zone.home
+      {% endfor %}
+
+action:
+  - if:
+      # Daytime condition
+      - condition: time
+        after: "06:00:00"
+        before: "20:59:59"
+      # Manual override condition: Only run if the manual switch is OFF
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'off'
+    then:
+      - service: light.turn_on
+        target: !input daytime_light_target
+      - delay:
+          seconds: !input light_duration
+      - service: light.turn_off
+        target: !input daytime_light_target
+  - if:
+      # Nighttime condition
+      - condition: time
+        after: "21:00:00"
+        before: "05:59:59"
+      # Manual override condition: Only run if the manual switch is OFF
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'off'
+    then:
+      - service: light.turn_on
+        data:
+          rgb_color:
+            - 255
+            - 133
+            - 26
+          brightness_pct: 100
+        target: !input nighttime_light_target
+      - delay:
+          seconds: !input light_duration
+      - service: light.turn_off
+        target: !input nighttime_light_target
+  - if:
+      # This 'if' block ensures that if the manual switch is turned ON, the light target
+      # is also turned ON, respecting the manual override.
+      # It doesn't interfere with the motion logic, which is now gated by the 'manual_override_switch' state.
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'on'
+    then:
+      # Choose which light to turn on. It's best to use the primary light target.
+      # This action only fires if the motion automation didn't (because the switch was ON).
+      - service: light.turn_on
+        target: !input daytime_light_target # Or !input nighttime_light_target if you prefer
+                                             # You might need to pick the entity that the Avatto switch actually controls.
+                                             # If the Avatto switch directly controls the light, this action might be redundant.
+                                             # Its primary purpose here is to confirm the blueprint logic covers all states.
+
+mode: restart
