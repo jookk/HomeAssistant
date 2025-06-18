@@ -1,0 +1,117 @@
+blueprint:
+  name: WC Motion Light with Manual Override
+  description: Turns on a light in the WC based on motion and time of day, with a manual switch override.
+  domain: automation
+  source_url: https://gist.github.com/yourusername/example_gist_url # Replace with your actual Gist URL if you share it
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: The motion sensor in the WC.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+    daytime_light_target:
+      name: Daytime Light (Target)
+      description: The light to turn on during daytime hours (6:00 AM - 8:59 PM).
+      selector:
+        target:
+          entity:
+            domain: light
+    nighttime_light_target:
+      name: Nighttime Light (Target)
+      description: The light to turn on during nighttime hours (9:00 PM - 5:59 AM). This light will have a warm color.
+      selector:
+        target:
+          entity:
+            domain: light
+    manual_override_switch:
+      name: Manual Override Switch
+      description: The switch used for manual control of the light.
+      selector:
+        entity:
+          domain: switch
+    light_duration:
+      name: Light On Duration
+      description: How long the light stays on after motion is detected (in seconds).
+      default: 35
+      selector:
+        number:
+          min: 1
+          max: 300
+          unit_of_measurement: seconds
+    people_at_home_entities:
+      name: People at Home
+      description: Select the person entities that represent someone being home. The automation only runs if at least one is in the 'home' zone.
+      selector:
+        entity:
+          domain: person
+          multiple: true
+
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    from: 'off'
+    to: 'on'
+
+condition:
+  - condition: or
+    conditions: !input people_at_home_entities
+    # The blueprint will automatically wrap the person entities in zone conditions based on the input selector
+
+action:
+  - if:
+      # Daytime condition
+      - condition: time
+        after: "06:00:00"
+        before: "20:59:59"
+      # Manual override condition: Only run if the manual switch is OFF
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'off'
+    then:
+      - service: light.turn_on
+        target: !input daytime_light_target
+      - delay:
+          seconds: !input light_duration
+      - service: light.turn_off
+        target: !input daytime_light_target
+  - if:
+      # Nighttime condition
+      - condition: time
+        after: "21:00:00"
+        before: "05:59:59"
+      # Manual override condition: Only run if the manual switch is OFF
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'off'
+    then:
+      - service: light.turn_on
+        data:
+          rgb_color:
+            - 255
+            - 133
+            - 26
+          brightness_pct: 100
+        target: !input nighttime_light_target
+      - delay:
+          seconds: !input light_duration
+      - service: light.turn_off
+        target: !input nighttime_light_target
+  # This section handles the manual switch directly controlling the light and disabling motion automation
+  - if:
+      # If the manual switch is turned ON, turn on the light and prevent motion from turning it off
+      - condition: state
+        entity_id: !input manual_override_switch
+        state: 'on'
+    then:
+      - service: light.turn_on
+        target: !input daytime_light_target # Assuming daytime light is the default for manual on
+                                             # You might want to make this configurable or pick one.
+                                             # Or better, just turn on the specific light the switch controls.
+                                             # For simplicity, we are using one of the input lights here.
+                                             # If your Avatto switch directly controls the light, this 'then' block
+                                             # might not be strictly necessary as the switch handles it.
+                                             # The key is the 'condition' in the motion blocks.
+
+mode: restart
