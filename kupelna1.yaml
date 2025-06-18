@@ -56,14 +56,9 @@ trigger:
 
 condition:
   - condition: or
-    conditions:
-      # OPRAVENÁ SEKCIA PRE PODMIENKY ZÓNY
-      # Prechádzame cez každý vybraný 'person' entitu a vytvárame pre ňu 'zone' podmienku
-      {% for person_entity in people_at_home_entities %}
-      - condition: zone
-        entity_id: {{ person_entity }}
-        zone: zone.home
-      {% endfor %}
+    # CORRECTED SECTION FOR ZONE CONDITIONS
+    # This uses a template to build the list of zone conditions from the input entities
+    conditions: "{{ people_at_home_entities | map('dict', 'condition', 'zone', 'entity_id', 'zone', 'zone.home') | list }}"
 
 action:
   - if:
@@ -105,19 +100,18 @@ action:
       - service: light.turn_off
         target: !input nighttime_light_target
   - if:
-      # This 'if' block ensures that if the manual switch is turned ON, the light target
-      # is also turned ON, respecting the manual override.
-      # It doesn't interfere with the motion logic, which is now gated by the 'manual_override_switch' state.
+      # This 'if' block handles the manual switch being turned ON.
+      # When the switch is ON, we ensure the light is ON.
+      # The main motion automation will not run if this switch is ON.
       - condition: state
         entity_id: !input manual_override_switch
         state: 'on'
     then:
-      # Choose which light to turn on. It's best to use the primary light target.
-      # This action only fires if the motion automation didn't (because the switch was ON).
       - service: light.turn_on
-        target: !input daytime_light_target # Or !input nighttime_light_target if you prefer
-                                             # You might need to pick the entity that the Avatto switch actually controls.
-                                             # If the Avatto switch directly controls the light, this action might be redundant.
-                                             # Its primary purpose here is to confirm the blueprint logic covers all states.
+        target: !input daytime_light_target # Use the daytime target for manual on.
+                                             # You might still want to adjust this if your manual switch
+                                             # controls a specific light that isn't always the 'daytime_light_target'.
+                                             # However, the core of the manual override is that the motion automation
+                                             # does NOT run when the switch is ON.
 
 mode: restart
