@@ -1,0 +1,74 @@
+blueprint:
+  name: Svetlá na základe pohybu s časovačom
+  description: >-
+    Zapne svetlo pri detekcii pohybu a vypne ho po určenom čase bez pohybu.
+    Automatizácia funguje len vo zvolenom časovom okne.
+    Časovač vypnutia sa reštartuje pri každej novej detekcii pohybu,
+    takže svetlo nezhasne, kým ste v miestnosti.
+  domain: automation
+  input:
+    motion_entity:
+      name: Pohybový senzor
+      description: Pohybový senzor (alebo viac senzorov), ktorý spúšťa automatizáciu.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: motion
+          multiple: true
+    light_target:
+      name: Svetlá
+      description: Svetlo (alebo skupina svetiel), ktoré sa má ovládať.
+      selector:
+        target:
+          entity:
+            domain: light
+    no_motion_wait:
+      name: Čas čakania (v sekundách)
+      description: Čas v sekundách, ktorý sa má čakať pred vypnutím svetiel po tom, čo už nie je detegovaný pohyb.
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: seconds
+          mode: slider
+      default: 120
+    time_condition_after:
+      name: (Voliteľné) Spustiť iba po tomto čase
+      description: Čas, od ktorého má byť automatizácia aktívna.
+      selector:
+        time:
+      default: "00:00:00"
+    time_condition_before:
+      name: (Voliteľné) Spustiť iba pred týmto časom
+      description: Čas, do ktorého má byť automatizácia aktívna.
+      selector:
+        time:
+      default: "23:59:59"
+
+# Tento režim zabezpečí, že sa automatizácia reštartuje pri každom novom pohybe,
+# čím udrží svetlá zapnuté.
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input motion_entity
+    to: "on"
+    from: "off"
+
+condition:
+  - condition: time
+    after: !input time_condition_after
+    before: !input time_condition_before
+
+action:
+  - service: light.turn_on
+    target: !input light_target
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input motion_entity
+        to: "off"
+  - delay: !input no_motion_wait
+  - service: light.turn_off
+    target: !input light_target
+
